@@ -19,7 +19,7 @@ class AgentConfig(BaseModel):
     )
     model: Optional[str] = Field(
         None,
-        description="The specific model used by the agent, e.g., 'gemini-2.5-pro-preview-03-25'",
+        description="The specific model used by the agent, e.g., 'gemini-2.5-flash'",
     )
     relies_on: Optional[List[int]] = Field(
         None, description="List of agent IDs that this agent relies on for its task."

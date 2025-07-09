@@ -45,7 +45,7 @@ tools = [
 
 def CreateMaster(model, system, outputModel):
     agent = Agent(
-        model=Gemini(id=model, show_tool_calls=True),
+        model=Gemini(id=model),
         tools=tools,
         system_message=system,
         show_tool_calls=True,
@@ -63,7 +63,7 @@ def CreateMaster(model, system, outputModel):
 
 def CreateChild(model, system):
     agent = Agent(
-        model=Gemini(id=model, show_tool_calls=True),
+        model=Gemini(id=model),
         tools=tools,
         system_message=system,
         show_tool_calls=True,

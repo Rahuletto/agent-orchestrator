@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>AI Agent Orchestrator - Stream Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+        }
+
+        .events {
+            border: 1px solid #ccc;
+            height: 400px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin: 10px 0;
+            background: #f9f9f9;
+        }
+
+        .event {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007acc;
+            background: white;
+        }
+
+        .error {
+            border-left-color: #dc3545;
+        }
+
+        .complete {
+            border-left-color: #28a745;
+        }
+
+        .agent_created {
+            border-left-color: #17a2b8;
+        }
+
+        .agent_response_chunk {
+            border-left-color: #6f42c1;
+        }
+
+        .final_response_chunk {
+            border-left-color: #fd7e14;
+        }
+
+        .model_info {
+            border-left-color: #20c997;
+        }
+
+        .model_overloaded {
+            border-left-color: #ffc107;
+        }
+
+        .fallback_attempt {
+            border-left-color: #e83e8c;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>AI Agent Orchestrator - Stream Test</h1>
+        <p>This page demonstrates how to consume the streaming API endpoint.</p>
+
+        <textarea id="queryInput"
+            placeholder="Enter your query here...">What are the latest trends in artificial intelligence?</textarea>
+        <br>
+        <button onclick="startStream()">Start Stream</button>
+        <button onclick="clearEvents()">Clear</button>
+
+        <div id="events" class="events"></div>
+
+    </div>
+
+    <script>
+        let eventSource = null;
+
+        function startStream() {
+            const query = document.getElementById('queryInput').value;
+            if (!query.trim()) {
+                alert('Please enter a query');
+                return;
+            }
+
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            addEvent('info', 'Connecting to stream...');
+
+            fetch('/chat/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: query })
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function readStream() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            addEvent('complete', 'Stream completed');
+                            return;
+                        }
+
+                        buffer += decoder.decode(value, { stream: true });
+
+                        // Process complete SSE messages
+                        const messages = buffer.split('\n\n');
+                        buffer = messages.pop(); // Keep incomplete message in buffer
+
+                        for (const message of messages) {
+                            if (message.trim()) {
+                                processSSEMessage(message.trim());
+                            }
+                        }
+
+                        readStream();
+                    }).catch(error => {
+                        addEvent('error', `Stream error: ${error.message}`);
+                    });
+                }
+
+                readStream();
+            }).catch(error => {
+                addEvent('error', `Fetch error: ${error.message}`);
+            });
+        }
+
+        function processSSEMessage(message) {
+            const lines = message.split('\n');
+            let eventType = 'message';
+            let data = '';
+
+            for (const line of lines) {
+                if (line.startsWith('event:')) {
+                    eventType = line.substring(6).trim();
+                } else if (line.startsWith('data:')) {
+                    data = line.substring(5).trim();
+                }
+            }
+
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    addEvent(eventType, JSON.stringify(parsed, null, 2));
+                } catch (e) {
+                    addEvent(eventType, data);
+                }
+            }
+        }
+
+        function addEvent(type, content) {
+            const events = document.getElementById('events');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = `event ${type}`;
+            eventDiv.innerHTML = `<strong>[${type.toUpperCase()}]</strong> <small>${new Date().toLocaleTimeString()}</small><br><pre>${content}</pre>`;
+            events.appendChild(eventDiv);
+            events.scrollTop = events.scrollHeight;
+        }
+
+        function clearEvents() {
+            document.getElementById('events').innerHTML = '';
+        }
+    </script>
+</body>
+
+</html>
